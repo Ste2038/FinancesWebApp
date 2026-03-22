@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Logs and temp files
+logs/
+tmp/
+*.log
+.DS_Store
+
+# Public-project local secrets
+.env
+.env.local
+.env.*.local
+
+# Local-only documentation/context
+codex.md
+
+# Local runtime data
+data/
+uploads/
+
+# SQLite and database artifacts
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+money_android.sqlite
