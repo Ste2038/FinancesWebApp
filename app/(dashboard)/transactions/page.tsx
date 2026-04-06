@@ -1,4 +1,5 @@
 import { getTransactionsList } from "@/lib/server/finance-data";
+import { formatEuroCurrency } from "@/lib/format/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +44,7 @@ function formatDisplayDate(transactionDate: string | null, bookedAt: string | nu
 }
 
 function formatAmount(amount: number | null) {
-  if (amount === null) {
-    return "EUR 0.00";
-  }
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-  }).format(amount);
+  return formatEuroCurrency(amount ?? 0);
 }
 
 export default async function TransactionsPage() {

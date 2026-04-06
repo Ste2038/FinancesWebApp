@@ -2,6 +2,7 @@ import { GroupedBars } from "@/components/charts/grouped-bars";
 import { LineChart } from "@/components/charts/line-chart";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { SummaryCard } from "@/components/dashboard/summary-card";
+import { formatEuroCurrency, formatSignedEuroCurrency } from "@/lib/format/currency";
 import { getOverviewState } from "@/lib/server/finance-data";
 
 const netWorthSeries = [
@@ -71,32 +72,6 @@ function toMonthlyLineSeries(series: Array<{ date: string; value: number }>, fal
   return values.length > 0 ? values.slice(-12) : fallback;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDetailedCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatSignedCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-    signDisplay: "always",
-  }).format(value);
-}
-
 function toMonthlyBars(series: Array<{ date: string; value: number }>) {
   if (series.length === 0) {
     return monthlyFood;
@@ -143,7 +118,7 @@ export default async function OverviewPage() {
             delta={`${snapshot.totals.transactions} transactions recorded`}
             label="Net flow"
             tone="accent"
-            value={formatSignedCurrency(snapshot.balances.netFlow)}
+            value={formatSignedEuroCurrency(snapshot.balances.netFlow)}
           />
           <SummaryCard
             delta={`${snapshot.totals.accounts} active accounts`}
@@ -159,7 +134,7 @@ export default async function OverviewPage() {
             delta={`${snapshot.totals.categories} categories mapped`}
             label="Expenses"
             tone="warning"
-            value={formatCurrency(snapshot.balances.expenses)}
+            value={formatEuroCurrency(snapshot.balances.expenses)}
           />
         </div>
       </section>
@@ -198,7 +173,7 @@ export default async function OverviewPage() {
                 <tr key={account.source_uid}>
                   <td>{account.display_name}</td>
                   <td>{account.group_name ?? "Ungrouped"}</td>
-                  <td>{formatDetailedCurrency(account.balance)}</td>
+                  <td>{formatEuroCurrency(account.balance)}</td>
                   <td>
                     <span className="badge badge--good">Active</span>
                   </td>

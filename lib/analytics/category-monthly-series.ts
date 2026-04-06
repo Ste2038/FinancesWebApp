@@ -3,7 +3,6 @@ import { SqliteClient } from "../db/types";
 import {
   buildAnalyticsWhereClause,
   NORMALIZED_TRANSACTION_DATE_SQL,
-  SIGNED_TRANSACTION_AMOUNT_SQL,
 } from "./query-helpers";
 
 export interface CategoryMonthlyQueryContext {
@@ -19,8 +18,8 @@ export async function getCategoryMonthlySeries(
     .replaceAll("transaction_date", "t.transaction_date")
     .replaceAll("created_at", "t.created_at");
   const aliasedSignedAmountSql = `CASE
-    WHEN t.transaction_type IN (1, 3, 8) THEN -ABS(COALESCE(t.amount_account, t.amount, 0))
-    WHEN t.transaction_type IN (0, 4, 7) THEN ABS(COALESCE(t.amount_account, t.amount, 0))
+    WHEN t.transaction_type IN (1, 3, 8) THEN -COALESCE(t.amount_account, t.amount, 0)
+    WHEN t.transaction_type IN (0, 4, 7) THEN COALESCE(t.amount_account, t.amount, 0)
     ELSE COALESCE(t.amount_account, t.amount, 0)
   END`;
   const { whereClause, params } = buildAnalyticsWhereClause(filters, {

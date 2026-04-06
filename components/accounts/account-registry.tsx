@@ -3,18 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AccountListItem } from "@/lib/server/finance-data";
+import { formatEuroCurrency } from "@/lib/format/currency";
 
 interface AccountRegistryProps {
   accounts: AccountListItem[];
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 export function AccountRegistry({ accounts }: AccountRegistryProps) {
@@ -234,7 +226,7 @@ export function AccountRegistry({ accounts }: AccountRegistryProps) {
                   </td>
                   <td>{account.display_name}</td>
                   <td>{account.group_name ?? "Ungrouped"}</td>
-                  <td>{formatCurrency(account.balance)}</td>
+                  <td>{formatEuroCurrency(account.balance)}</td>
                   {showArchived ? (
                     <td>
                       <span className={`badge${isArchived ? " badge--warning" : " badge--good"}`}>{statusLabel}</span>

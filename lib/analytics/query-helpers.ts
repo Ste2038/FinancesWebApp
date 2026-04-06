@@ -27,8 +27,8 @@ export const NORMALIZED_TRANSACTION_DATE_SQL = `COALESCE(
 )`;
 
 export const SIGNED_TRANSACTION_AMOUNT_SQL = `CASE
-  WHEN transaction_type IN (1, 3, 8) THEN -ABS(COALESCE(amount_account, amount, 0))
-  WHEN transaction_type IN (0, 4, 7) THEN ABS(COALESCE(amount_account, amount, 0))
+  WHEN transaction_type IN (1, 3, 8) THEN -COALESCE(amount_account, amount, 0)
+  WHEN transaction_type IN (0, 4, 7) THEN COALESCE(amount_account, amount, 0)
   ELSE COALESCE(amount_account, amount, 0)
 END`;
 

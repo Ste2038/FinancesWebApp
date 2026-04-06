@@ -425,6 +425,7 @@ strong {
 .chart__svg {
   width: 100%;
   height: auto;
+  overflow: visible;
 }
 
 .chart__grid {
@@ -437,16 +438,26 @@ strong {
   stroke-dasharray: 4 10;
 }
 
+.chart__axis-line {
+  stroke: rgba(48, 28, 17, 0.16);
+  stroke-width: 1;
+}
+
+.chart__axis-label {
+  fill: var(--muted);
+  font-size: 0.72rem;
+}
+
+.chart__axis-label--y {
+  dominant-baseline: middle;
+}
+
 .chart__line {
   stroke: var(--accent);
   stroke-width: 4;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.chart__area {
-  fill: url(#line-fill);
 }
 
 .chart__point {
@@ -459,6 +470,8 @@ strong {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
+  padding-left: var(--chart-label-padding-left, 0);
+  padding-right: var(--chart-label-padding-right, 0);
   font-size: 0.86rem;
   color: var(--muted);
 }
