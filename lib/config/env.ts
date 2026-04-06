@@ -3,8 +3,6 @@ export interface RuntimeEnv {
   uploadsDir: string;
   telegramToken?: string;
   telegramAllowedIds: number[];
-  telegramWebhookSecret?: string;
-  telegramWebhookPath: string;
   timeZone: string;
 }
 
@@ -44,10 +42,6 @@ export function readRuntimeEnv(env: NodeJS.ProcessEnv = process.env): RuntimeEnv
     telegramAllowedIds: parseAllowedIds(
       env.FINANCES_TELEGRAM_ALLOWED_IDS ?? env.TELEGRAM_ALLOWED_IDS,
     ),
-    telegramWebhookSecret:
-      env.FINANCES_TELEGRAM_WEBHOOK_SECRET ?? env.TELEGRAM_WEBHOOK_SECRET,
-    telegramWebhookPath:
-      env.FINANCES_TELEGRAM_WEBHOOK_PATH ?? env.TELEGRAM_WEBHOOK_PATH ?? "/api/telegram/webhook",
     timeZone: env.TZ ?? env.FINANCES_TIME_ZONE ?? "Europe/Rome",
   };
 }

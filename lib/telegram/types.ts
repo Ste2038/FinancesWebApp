@@ -1,8 +1,6 @@
 export interface TelegramBotConfig {
   token?: string;
   allowedChatIds: number[];
-  webhookSecret?: string;
-  webhookPath: string;
 }
 
 export interface TelegramCommandEnvelope {

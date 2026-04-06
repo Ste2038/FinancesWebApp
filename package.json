@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx scripts/dev.ts dev",
     "build": "next build",
-    "start": "next start",
+    "start": "tsx scripts/dev.ts start",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:inspect-phone": "tsx scripts/inspect-phone-db.ts"
+    "db:inspect-phone": "tsx scripts/inspect-phone-db.ts",
+    "telegram:poll": "tsx scripts/telegram-poll.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

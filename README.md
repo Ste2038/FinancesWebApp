@@ -126,6 +126,15 @@ Telegram is part of the control surface for the project.
 - Accept commands to add an expense.
 - Accept commands to report the current financial situation.
 - Reject messages from unauthorized IDs.
+- The app uses long polling only. Webhooks are not supported anymore.
+- If `TELEGRAM_BOT_TOKEN` is set, both `npm run dev` and `npm run start` launch the web app and the Telegram listener together.
+- If you want to run the poller by itself for debugging, you can still use:
+
+  ```bash
+  npm run telegram:poll
+  ```
+
+  This is useful when you want to inspect Telegram traffic without starting the full web app.
 
 ## Local Setup
 
@@ -145,4 +154,3 @@ Suggested environment variables:
 - `UPLOADS_DIR`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_ALLOWED_IDS`
-- `TELEGRAM_WEBHOOK_SECRET`

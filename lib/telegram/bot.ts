@@ -13,8 +13,6 @@ export function createTelegramBotConfig(): TelegramBotConfig {
   return {
     token: env.telegramToken,
     allowedChatIds: env.telegramAllowedIds,
-    webhookSecret: env.telegramWebhookSecret,
-    webhookPath: env.telegramWebhookPath,
   };
 }
 
@@ -24,6 +22,13 @@ export async function handleTelegramEnvelope(
 ): Promise<string> {
   const config = createTelegramBotConfig();
   if (!isTelegramIdentityAllowed(envelope.chatId, config.allowedChatIds)) {
+    console.warn(
+      `[telegram] Rejected message from not allowed id: ${JSON.stringify({
+        chatId: envelope.chatId,
+        userId: envelope.userId ?? null,
+        text: envelope.text,
+      })}`,
+    );
     throw new Error("Telegram chat is not allowed");
   }
 
