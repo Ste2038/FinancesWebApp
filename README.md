@@ -2,6 +2,47 @@
 
 Personal finance web app for desktop and mobile. The goal is to provide a clear view of your financial situation, import and reconcile data from the SQLite database exported by the phone app, and expose dashboards, charts, and Telegram-based actions.
 
+## Quick Start
+
+To run the web app locally in development:
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Create the local environment file:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Open `http://localhost:3000`
+
+Notes:
+
+- The app uses the SQLite path from `.env.local`. The default value points to `./data/app.sqlite`.
+- Database migrations run automatically when the app starts, so a separate setup step is usually not required.
+- If you want to run migrations manually, use:
+
+  ```bash
+  npm run db:migrate
+  ```
+
+To run a production build locally:
+
+```bash
+npm run build
+npm run start
+```
+
 ## What This Project Does
 
 - Tracks the financial picture across accounts, groups, categories, and expenses.
