@@ -3,6 +3,7 @@ export interface RuntimeEnv {
   uploadsDir: string;
   telegramToken?: string;
   telegramAllowedIds: number[];
+  bankStatementAllowedConti: string[];
   timeZone: string;
 }
 
@@ -31,6 +32,17 @@ export function parseAllowedIds(input: string | undefined): number[] {
     .filter((value) => Number.isFinite(value));
 }
 
+function parseList(input: string | undefined): string[] {
+  if (!input) {
+    return [];
+  }
+
+  return input
+    .split(/[\n,;]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 export function readRuntimeEnv(env: NodeJS.ProcessEnv = process.env): RuntimeEnv {
   return {
     databasePath: normalizeDatabasePath(
@@ -41,6 +53,9 @@ export function readRuntimeEnv(env: NodeJS.ProcessEnv = process.env): RuntimeEnv
       env.FINANCES_TELEGRAM_TOKEN || env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_TOKEN,
     telegramAllowedIds: parseAllowedIds(
       env.FINANCES_TELEGRAM_ALLOWED_IDS ?? env.TELEGRAM_ALLOWED_IDS,
+    ),
+    bankStatementAllowedConti: parseList(
+      env.FINANCES_BANK_STATEMENT_ALLOWED_CONTI ?? env.BANK_STATEMENT_ALLOWED_CONTI,
     ),
     timeZone: env.TZ ?? env.FINANCES_TIME_ZONE ?? "Europe/Rome",
   };

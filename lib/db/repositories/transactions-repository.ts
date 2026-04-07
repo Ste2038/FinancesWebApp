@@ -11,10 +11,17 @@ export interface TransactionRow {
   transaction_type: number | null;
   transaction_date: string | null;
   booked_at: string | null;
+  paid_at: string | null;
   amount: number | null;
   amount_account: number | null;
+  memo: string | null;
+  content: string | null;
+  payee: string | null;
+  sms_origin: string | null;
   source_deleted: number;
+  is_paid: number;
   origin: string;
+  source_raw_json: string | null;
 }
 
 export interface TransactionsRepository {
@@ -40,10 +47,17 @@ export function createTransactionsRepository(
           transaction_type,
           transaction_date,
           booked_at,
+          paid_at,
           amount,
           amount_account,
+          memo,
+          content,
+          payee,
+          sms_origin,
           source_deleted,
-          origin
+          is_paid,
+          origin,
+          source_raw_json
         FROM transactions
         ORDER BY COALESCE(transaction_date, booked_at) DESC, id DESC`,
       );
@@ -60,10 +74,17 @@ export function createTransactionsRepository(
           transaction_type,
           transaction_date,
           booked_at,
+          paid_at,
           amount,
           amount_account,
+          memo,
+          content,
+          payee,
+          sms_origin,
           source_deleted,
-          origin
+          is_paid,
+          origin,
+          source_raw_json
         FROM transactions
         WHERE source_uid = ?
         LIMIT 1`,
@@ -91,6 +112,7 @@ export function createTransactionsRepository(
           content,
           payee,
           sms_origin,
+          source_raw_json,
           source_hash,
           source_deleted,
           is_paid,
@@ -105,7 +127,7 @@ export function createTransactionsRepository(
           ?,
           (SELECT id FROM categories WHERE source_uid = ? LIMIT 1),
           ?,
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END,
           ?,
           datetime('now')
@@ -127,6 +149,7 @@ export function createTransactionsRepository(
           content = excluded.content,
           payee = excluded.payee,
           sms_origin = excluded.sms_origin,
+          source_raw_json = excluded.source_raw_json,
           source_hash = excluded.source_hash,
           source_deleted = excluded.source_deleted,
           is_paid = excluded.is_paid,
@@ -151,6 +174,7 @@ export function createTransactionsRepository(
           input.content,
           input.payee,
           input.smsOrigin,
+          input.sourceRaw ? JSON.stringify(input.sourceRaw) : null,
           input.sourceHash,
           input.sourceDeleted ? 1 : 0,
           input.isPaid ? 1 : 0,

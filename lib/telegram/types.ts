@@ -9,6 +9,18 @@ export interface TelegramCommandEnvelope {
   text: string;
 }
 
+export interface TelegramDocumentReference {
+  fileId: string;
+  fileName?: string;
+  mimeType?: string;
+}
+
+export interface TelegramDocumentEnvelope {
+  chatId: number;
+  userId?: number;
+  document: TelegramDocumentReference;
+}
+
 export interface TelegramExpenseCommand {
   amount: number;
   memo?: string;

@@ -1,6 +1,6 @@
 # FinancesWebApp
 
-Personal finance web app for desktop and mobile. The goal is to provide a clear view of your financial situation, import and reconcile data from the SQLite database exported by the phone app, and expose dashboards, charts, and Telegram-based actions.
+Personal finance web app for desktop and mobile. The goal is to provide a clear view of your financial situation, import and reconcile data from the SQLite database exported by the phone app or from supported bank statement PDFs, and expose dashboards, charts, and Telegram-based actions.
 
 ## Quick Start
 
@@ -46,7 +46,7 @@ npm run start
 ## What This Project Does
 
 - Tracks the financial picture across accounts, groups, categories, and expenses.
-- Imports another SQLite database from the phone app and shows detected differences before applying changes.
+- Imports another SQLite database from the phone app and supported bank statement PDFs, then shows detected differences before applying changes.
 - Prevents duplicate imports through source identifiers and deterministic matching.
 - Provides responsive pages for balances, transaction history, and analytics.
 - Supports Telegram commands for adding an expense and checking the current situation.
@@ -59,7 +59,7 @@ The codebase is intentionally split into a few clear areas:
 - `components/` for shared UI pieces such as charts, tables, forms, and mobile layouts.
 - `lib/db/` for SQLite access, schema, migrations, repositories, and typed queries.
 - `lib/domain/` for business rules around accounts, categories, transactions, and imports.
-- `lib/importers/` for parsing the phone SQLite file, normalizing rows, diffing, and applying imports.
+- `lib/importers/` for parsing the phone SQLite file and supported bank statement PDFs, normalizing rows, diffing, and applying imports.
 - `lib/analytics/` for time-series and grouped finance queries.
 - `lib/telegram/` for bot authorization and message handling.
 - `tests/` for unit, integration, and end-to-end coverage.
@@ -109,14 +109,21 @@ Observed source table sizes from the bundled export:
 
 ## Import Workflow
 
-1. Upload a phone SQLite file.
-2. Parse supported source tables into normalized staging data.
+1. Upload a phone SQLite file or a supported bank statement PDF.
+2. Parse the source into normalized staging data.
 3. Compare the staging data against the local database.
-4. Show additions, changes, deletions, and unchanged rows.
-5. Let the user choose what to add, keep, update, or mark deleted.
+4. Show additions, matches, changes, deletions, and unchanged rows.
+5. Let the user choose what to add, keep, update, ignore, or mark deleted.
 6. Apply the selected actions in a single transaction.
 
 The import flow must not write directly into the main tables before review.
+
+For bank statement PDFs:
+
+- The importer validates the statement layout and the allowed `conto` values from `.env.local`.
+- Each row becomes a transaction candidate only; accounts and categories are assigned during review.
+- A row can be turned into a transfer during review, and the apply step expands it into the two ledger legs needed by the database.
+- `pdftotext` must be available on the machine running the app.
 
 ## Telegram
 
@@ -125,6 +132,7 @@ Telegram is part of the control surface for the project.
 - Configure the bot token and the allowed chat or user IDs in local ignored environment files.
 - Accept commands to add an expense.
 - Accept commands to report the current financial situation.
+- Accept supported bank statement PDFs and turn them into import batches for website review.
 - Reject messages from unauthorized IDs.
 - The app uses long polling only. Webhooks are not supported anymore.
 - If `TELEGRAM_BOT_TOKEN` is set, both `npm run dev` and `npm run start` launch the web app and the Telegram listener together.
@@ -154,3 +162,4 @@ Suggested environment variables:
 - `UPLOADS_DIR`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_ALLOWED_IDS`
+- `BANK_STATEMENT_ALLOWED_CONTI`

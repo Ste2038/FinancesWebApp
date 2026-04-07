@@ -77,10 +77,18 @@ export interface ImportCandidate<T = unknown> {
   diff?: Record<string, unknown>;
 }
 
+export interface TransactionReviewInput {
+  accountSourceUid: string | null;
+  categorySourceUid: string | null;
+  isTransfer: boolean;
+  targetAccountSourceUid: string | null;
+}
+
 export interface ImportApplySelection {
   entityType: EntityType;
   entityKey: string;
   action: ImportAction;
+  transactionReview?: TransactionReviewInput;
 }
 
 export interface ImportBatchSummary {

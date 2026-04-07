@@ -5,7 +5,7 @@ import {
   sendTelegramMessage,
   TelegramUpdate,
 } from "./api";
-import { processTelegramEnvelope } from "./service";
+import { processTelegramDocumentEnvelope, processTelegramEnvelope } from "./service";
 
 const POLL_TIMEOUT_SECONDS = 30;
 const RETRY_DELAY_MS = 3_000;
@@ -60,24 +60,40 @@ function getEnvelopeFromUpdate(update: TelegramUpdate) {
   const message = update.message ?? update.edited_message;
   const chatId = message?.chat?.id;
   const userId = message?.from?.id;
-  const text = message?.text;
-
-  if (!chatId || typeof text !== "string") {
+  if (!chatId) {
     return null;
   }
 
-  return {
-    chatId,
-    text,
-    userId,
-  };
+  if (typeof message?.text === "string") {
+    return {
+      kind: "text" as const,
+      chatId,
+      text: message.text,
+      userId,
+    };
+  }
+
+  if (message?.document?.file_id) {
+    return {
+      kind: "document" as const,
+      chatId,
+      userId,
+      document: {
+        fileId: message.document.file_id,
+        fileName: message.document.file_name,
+        mimeType: message.document.mime_type,
+      },
+    };
+  }
+
+  return null;
 }
 
 async function processUpdate(token: string, update: TelegramUpdate) {
   const envelope = getEnvelopeFromUpdate(update);
 
   if (!envelope) {
-    console.info(`[telegram] Ignored update ${update.update_id} without text content`);
+    console.info(`[telegram] Ignored update ${update.update_id} without supported content`);
     return;
   }
 
@@ -86,7 +102,9 @@ async function processUpdate(token: string, update: TelegramUpdate) {
   );
 
   try {
-    const reply = await processTelegramEnvelope(envelope);
+    const reply = envelope.kind === "document"
+      ? await processTelegramDocumentEnvelope(token, envelope)
+      : await processTelegramEnvelope(envelope);
     await sendTelegramMessage(token, envelope.chatId, reply);
   } catch (error) {
     console.error(

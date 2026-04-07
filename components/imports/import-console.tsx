@@ -1,16 +1,36 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { formatSignedEuroCurrency } from "@/lib/format/currency";
+
+type ImportAction = "add" | "update" | "keep" | "delete" | "ignore";
+
+type TransactionReview = {
+  accountSourceUid: string | null;
+  categorySourceUid: string | null;
+  isTransfer: boolean;
+  targetAccountSourceUid: string | null;
+};
 
 type ImportCandidate = {
   entityType: string;
   entityKey: string;
-  action: "add" | "update" | "keep" | "delete" | "ignore";
-  suggestedAction?: "add" | "update" | "keep" | "delete" | "ignore";
+  action: ImportAction;
+  suggestedAction?: ImportAction;
   diffKind?: string;
   local?: Record<string, unknown>;
   incoming?: Record<string, unknown>;
   diff?: Record<string, unknown>;
+  allowedActions?: ImportAction[];
+  transactionReview?: TransactionReview;
+  statementDetails?: {
+    conto: string;
+    operation: string;
+    bankCategory: string | null;
+    bookedFlag: string | null;
+    signedAmount: number;
+    transactionDate: string | null;
+  };
 };
 
 type ParseResponse = {
@@ -30,7 +50,12 @@ type QueuedImport = {
   pending_candidates?: number;
 };
 
-const ACTIONS: Array<ImportCandidate["action"]> = ["add", "update", "keep", "delete", "ignore"];
+type Option = {
+  label: string;
+  value: string;
+};
+
+const ALL_ACTIONS: ImportAction[] = ["add", "update", "keep", "delete", "ignore"];
 
 function readBestLabel(payload: Record<string, unknown> | undefined) {
   if (!payload) {
@@ -38,22 +63,21 @@ function readBestLabel(payload: Record<string, unknown> | undefined) {
   }
 
   return (
-    (typeof payload.displayName === "string" && payload.displayName) ||
-    (typeof payload.memo === "string" && payload.memo) ||
-    (typeof payload.content === "string" && payload.content) ||
-    (typeof payload.sourceUid === "string" && payload.sourceUid) ||
-    "Unnamed record"
+    (typeof payload.displayName === "string" && payload.displayName)
+    || (typeof payload.memo === "string" && payload.memo)
+    || (typeof payload.content === "string" && payload.content)
+    || (typeof payload.sourceUid === "string" && payload.sourceUid)
+    || "Unnamed record"
   );
 }
 
 function describeCandidate(candidate: ImportCandidate) {
-  const incomingLabel = readBestLabel(candidate.incoming);
-  const localLabel = readBestLabel(candidate.local);
-
-  if (candidate.entityType === "transaction") {
-    return incomingLabel !== "No payload" ? incomingLabel : localLabel;
+  if (candidate.statementDetails?.operation) {
+    return candidate.statementDetails.operation;
   }
 
+  const incomingLabel = readBestLabel(candidate.incoming);
+  const localLabel = readBestLabel(candidate.local);
   return incomingLabel !== "No payload" ? incomingLabel : localLabel;
 }
 
@@ -64,9 +88,47 @@ function withSuggestedActions(candidates: ImportCandidate[]) {
   }));
 }
 
+function formatStatementDate(value: string | null | undefined) {
+  if (!value) {
+    return "Unknown date";
+  }
+
+  const parts = value.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  }
+
+  return value;
+}
+
+function createTransactionReviewPatch(
+  current: TransactionReview | undefined,
+  patch: Partial<TransactionReview>,
+): TransactionReview {
+  const nextReview: TransactionReview = {
+    accountSourceUid: current?.accountSourceUid ?? null,
+    categorySourceUid: current?.categorySourceUid ?? null,
+    isTransfer: current?.isTransfer ?? false,
+    targetAccountSourceUid: current?.targetAccountSourceUid ?? null,
+    ...patch,
+  };
+
+  if (nextReview.isTransfer) {
+    nextReview.categorySourceUid = null;
+  } else {
+    nextReview.targetAccountSourceUid = null;
+  }
+
+  return nextReview;
+}
+
 export function ImportConsole({
+  accountOptions,
+  categoryOptions,
   initialQueuedImports,
 }: {
+  accountOptions: Option[];
+  categoryOptions: Option[];
   initialQueuedImports: QueuedImport[];
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -74,7 +136,9 @@ export function ImportConsole({
   const [counts, setCounts] = useState<ParseResponse["counts"]>();
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
   const [queuedImports, setQueuedImports] = useState<QueuedImport[]>(initialQueuedImports);
-  const [feedback, setFeedback] = useState<string>("Upload a phone SQLite export to generate a reconciliation batch.");
+  const [feedback, setFeedback] = useState<string>(
+    "Upload a phone SQLite export or bank statement PDF to generate a reconciliation batch.",
+  );
   const [isPending, startTransition] = useTransition();
 
   const groupedCounts = useMemo(() => {
@@ -85,11 +149,28 @@ export function ImportConsole({
     return Object.entries(counts);
   }, [counts]);
 
-  function updateCandidateAction(entityKey: string, entityType: string, action: ImportCandidate["action"]) {
+  function updateCandidateAction(entityKey: string, entityType: string, action: ImportAction) {
     setCandidates((current) =>
       current.map((candidate) =>
         candidate.entityKey === entityKey && candidate.entityType === entityType
           ? { ...candidate, action }
+          : candidate,
+      ),
+    );
+  }
+
+  function updateCandidateTransactionReview(
+    entityKey: string,
+    entityType: string,
+    patch: Partial<TransactionReview>,
+  ) {
+    setCandidates((current) =>
+      current.map((candidate) =>
+        candidate.entityKey === entityKey && candidate.entityType === entityType
+          ? {
+              ...candidate,
+              transactionReview: createTransactionReviewPatch(candidate.transactionReview, patch),
+            }
           : candidate,
       ),
     );
@@ -111,7 +192,7 @@ export function ImportConsole({
 
   function handleUpload() {
     if (!selectedFile) {
-      setFeedback("Select a `.sqlite` file first.");
+      setFeedback("Select a `.sqlite` or `.pdf` file first.");
       return;
     }
 
@@ -137,8 +218,8 @@ export function ImportConsole({
         await refreshQueue();
         setFeedback(
           parsed.candidates.length > 0
-            ? `Batch ${parsed.batchId} is ready. Review ${parsed.candidates.length} actionable differences.`
-            : `Batch ${parsed.batchId} has no actionable differences.`,
+            ? `Batch ${parsed.batchId} is ready. Review ${parsed.candidates.length} candidates.`
+            : `Batch ${parsed.batchId} has no review candidates.`,
         );
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "Import parse failed");
@@ -179,6 +260,7 @@ export function ImportConsole({
               entityType: candidate.entityType,
               entityKey: candidate.entityKey,
               action: candidate.action,
+              transactionReview: candidate.transactionReview,
             })),
           }),
         });
@@ -199,7 +281,7 @@ export function ImportConsole({
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "Failed to apply import");
       }
-      });
+    });
   }
 
   function handleOpenBatch(nextBatchId: number) {
@@ -222,8 +304,8 @@ export function ImportConsole({
         setCandidates(withSuggestedActions(payload.candidates));
         setFeedback(
           payload.candidates.length > 0
-            ? `Opened queued batch ${payload.batchId} with ${payload.candidates.length} actionable differences.`
-            : `Queued batch ${payload.batchId} has no actionable differences left.`,
+            ? `Opened queued batch ${payload.batchId} with ${payload.candidates.length} candidates.`
+            : `Queued batch ${payload.batchId} has no review candidates left.`,
         );
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "Failed to open queued import");
@@ -283,15 +365,15 @@ export function ImportConsole({
       <div className="section-card">
         <div className="section-card__header">
           <div>
-            <h2>Import a phone SQLite</h2>
-            <p>The uploaded file stays in a local git-ignored folder. Only actionable differences are returned for review.</p>
+            <h2>Import a source file</h2>
+            <p>The uploaded file stays in a local git-ignored folder. SQLite exports and bank statement PDFs use the same batch review flow.</p>
           </div>
         </div>
 
         <div className="import-dropzone">
           <div className="import-console__controls">
             <input
-              accept=".sqlite,.db,.sqlite3"
+              accept=".sqlite,.db,.sqlite3,.pdf,application/pdf"
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
               type="file"
             />
@@ -326,7 +408,7 @@ export function ImportConsole({
           <div className="section-card__header">
             <div>
               <h2>Diff summary</h2>
-              <p>Counts include unchanged rows even though only actionable differences are shown below.</p>
+              <p>Matched duplicates are counted under unchanged rows. Statement PDF batches show transaction counts only.</p>
             </div>
           </div>
 
@@ -334,7 +416,7 @@ export function ImportConsole({
             {groupedCounts.map(([entityType, summary]) => (
               <article className="summary-card" key={entityType}>
                 <span className="summary-card__label">{entityType.replace("_", " ")}</span>
-                <strong>{summary.added + summary.changed + summary.missing}</strong>
+                <strong>{summary.added + summary.changed + summary.missing + summary.unchanged}</strong>
                 <p>
                   {summary.added} new, {summary.changed} changed, {summary.missing} missing, {summary.unchanged} unchanged
                 </p>
@@ -349,47 +431,144 @@ export function ImportConsole({
           <div className="section-card__header">
             <div>
               <h2>Review candidates</h2>
-              <p>Each candidate is explicit. You can change the default action before applying the batch.</p>
+              <p>Each candidate is explicit. Statement PDF rows let you choose the account, category, and transfer behavior before apply.</p>
             </div>
           </div>
 
           <div className="import-candidate-list">
-            {candidates.map((candidate) => (
-              <article className="import-candidate-card" key={`${candidate.entityType}:${candidate.entityKey}`}>
-                <div>
-                  <span className="metric-tag">{candidate.entityType.replace("_", " ")}</span>
-                  <h3>{describeCandidate(candidate)}</h3>
-                  <p className="muted">
-                    {candidate.entityKey}
-                    {candidate.diffKind ? ` · ${candidate.diffKind}` : ""}
-                  </p>
-                </div>
+            {candidates.map((candidate) => {
+              const allowedActions = candidate.allowedActions ?? ALL_ACTIONS;
+              const review = candidate.transactionReview;
 
-                <div className="import-candidate-card__side">
-                  <select
-                    className="select-input"
-                    onChange={(event) =>
-                      updateCandidateAction(
-                        candidate.entityKey,
-                        candidate.entityType,
-                        event.target.value as ImportCandidate["action"],
-                      )
-                    }
-                    value={candidate.action}
-                  >
-                    {ACTIONS.map((action) => (
-                      <option key={action} value={action}>
-                        {action}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="import-candidate-card__payload">
-                    <span>Incoming: {readBestLabel(candidate.incoming)}</span>
-                    <span>Local: {readBestLabel(candidate.local)}</span>
+              return (
+                <article className="import-candidate-card" key={`${candidate.entityType}:${candidate.entityKey}`}>
+                  <div className="import-candidate-card__main">
+                    <div>
+                      <span className="metric-tag">{candidate.entityType.replace("_", " ")}</span>
+                      <h3>{describeCandidate(candidate)}</h3>
+                      <p className="muted">
+                        {candidate.entityKey}
+                        {candidate.diffKind ? ` · ${candidate.diffKind}` : ""}
+                      </p>
+                    </div>
+
+                    {candidate.statementDetails ? (
+                      <div className="statement-details">
+                        <span><strong>Conto:</strong> {candidate.statementDetails.conto}</span>
+                        <span><strong>Data:</strong> {formatStatementDate(candidate.statementDetails.transactionDate)}</span>
+                        <span><strong>Importo:</strong> {formatSignedEuroCurrency(candidate.statementDetails.signedAmount)}</span>
+                        <span><strong>Contabilizzato:</strong> {candidate.statementDetails.bookedFlag ?? "N/A"}</span>
+                        <span><strong>Categoria banca:</strong> {candidate.statementDetails.bankCategory ?? "N/A"}</span>
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              </article>
-            ))}
+
+                  <div className="import-candidate-card__side">
+                    <select
+                      className="select-input"
+                      onChange={(event) =>
+                        updateCandidateAction(
+                          candidate.entityKey,
+                          candidate.entityType,
+                          event.target.value as ImportAction,
+                        )
+                      }
+                      value={candidate.action}
+                    >
+                      {allowedActions.map((action) => (
+                        <option key={action} value={action}>
+                          {action}
+                        </option>
+                      ))}
+                    </select>
+
+                    {candidate.statementDetails && review ? (
+                      <div className="statement-review">
+                        <label className="statement-review__field">
+                          <span>Account</span>
+                          <select
+                            className="select-input"
+                            onChange={(event) =>
+                              updateCandidateTransactionReview(candidate.entityKey, candidate.entityType, {
+                                accountSourceUid: event.target.value || null,
+                              })
+                            }
+                            value={review.accountSourceUid ?? ""}
+                          >
+                            <option value="">Select account</option>
+                            {accountOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="statement-review__checkbox">
+                          <input
+                            checked={review.isTransfer}
+                            onChange={(event) =>
+                              updateCandidateTransactionReview(candidate.entityKey, candidate.entityType, {
+                                isTransfer: event.target.checked,
+                              })
+                            }
+                            type="checkbox"
+                          />
+                          <span>Mark as transfer</span>
+                        </label>
+
+                        {review.isTransfer ? (
+                          <label className="statement-review__field">
+                            <span>Target account</span>
+                            <select
+                              className="select-input"
+                              onChange={(event) =>
+                                updateCandidateTransactionReview(candidate.entityKey, candidate.entityType, {
+                                  targetAccountSourceUid: event.target.value || null,
+                                })
+                              }
+                              value={review.targetAccountSourceUid ?? ""}
+                            >
+                              <option value="">Select target account</option>
+                              {accountOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <label className="statement-review__field">
+                            <span>Category</span>
+                            <select
+                              className="select-input"
+                              onChange={(event) =>
+                                updateCandidateTransactionReview(candidate.entityKey, candidate.entityType, {
+                                  categorySourceUid: event.target.value || null,
+                                })
+                              }
+                              value={review.categorySourceUid ?? ""}
+                            >
+                              <option value="">Select category</option>
+                              {categoryOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                      </div>
+                    ) : null}
+
+                    <div className="import-candidate-card__payload">
+                      <span>Incoming: {readBestLabel(candidate.incoming)}</span>
+                      <span>Local: {readBestLabel(candidate.local)}</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       ) : null}

@@ -16,21 +16,32 @@ export function createTelegramBotConfig(): TelegramBotConfig {
   };
 }
 
-export async function handleTelegramEnvelope(
-  envelope: TelegramCommandEnvelope,
-  dependencies: TelegramBotDependencies,
-): Promise<string> {
+export function assertTelegramIdentityAllowed(input: {
+  chatId: number;
+  userId?: number;
+  description: string;
+}) {
   const config = createTelegramBotConfig();
-  if (!isTelegramIdentityAllowed(envelope.chatId, config.allowedChatIds)) {
+  if (!isTelegramIdentityAllowed(input.chatId, config.allowedChatIds)) {
     console.warn(
-      `[telegram] Rejected message from not allowed id: ${JSON.stringify({
-        chatId: envelope.chatId,
-        userId: envelope.userId ?? null,
-        text: envelope.text,
+      `[telegram] Rejected ${input.description} from not allowed id: ${JSON.stringify({
+        chatId: input.chatId,
+        userId: input.userId ?? null,
       })}`,
     );
     throw new Error("Telegram chat is not allowed");
   }
+}
+
+export async function handleTelegramEnvelope(
+  envelope: TelegramCommandEnvelope,
+  dependencies: TelegramBotDependencies,
+): Promise<string> {
+  assertTelegramIdentityAllowed({
+    chatId: envelope.chatId,
+    userId: envelope.userId,
+    description: `message ${JSON.stringify({ text: envelope.text })}`,
+  });
 
   const parsed = parseTelegramMessage(envelope.text);
   if (parsed.name === "add_expense" && parsed.expense) {

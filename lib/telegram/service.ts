@@ -1,8 +1,10 @@
+import { importSourceFile } from "../importers/import-source-file";
 import { createSourceFingerprint } from "../importers/phone-sqlite/fingerprint";
 import { createAppContext } from "../server/app-context";
 import { getDashboardSnapshot } from "../server/dashboard";
-import { handleTelegramEnvelope } from "./bot";
-import { TelegramCommandEnvelope } from "./types";
+import { downloadTelegramFile, getTelegramFile } from "./api";
+import { assertTelegramIdentityAllowed, handleTelegramEnvelope } from "./bot";
+import { TelegramCommandEnvelope, TelegramDocumentEnvelope } from "./types";
 
 function formatSummaryMessage(snapshot: Awaited<ReturnType<typeof getDashboardSnapshot>>) {
   return [
@@ -34,8 +36,8 @@ export async function processTelegramEnvelope(
           transactionDate: new Date().toISOString().slice(0, 10),
           bookedAt: new Date().toISOString(),
           paidAt: null,
-          amount: -Math.abs(amount),
-          amountAccount: -Math.abs(amount),
+          amount: Math.abs(amount),
+          amountAccount: Math.abs(amount),
           memo: memo ?? null,
           content: memo ?? "Telegram expense",
           payee: null,
@@ -49,6 +51,49 @@ export async function processTelegramEnvelope(
         return formatSummaryMessage(snapshot);
       },
     });
+  } finally {
+    await context.client.close();
+  }
+}
+
+function isPdfDocument(input: TelegramDocumentEnvelope["document"]) {
+  return input.mimeType === "application/pdf"
+    || input.fileName?.toLocaleLowerCase("en-US").endsWith(".pdf")
+    || false;
+}
+
+export async function processTelegramDocumentEnvelope(
+  token: string,
+  envelope: TelegramDocumentEnvelope,
+): Promise<string> {
+  assertTelegramIdentityAllowed({
+    chatId: envelope.chatId,
+    userId: envelope.userId,
+    description: `document ${JSON.stringify({ fileName: envelope.document.fileName ?? null })}`,
+  });
+
+  if (!isPdfDocument(envelope.document)) {
+    return "Only PDF documents are supported for imports.";
+  }
+
+  const telegramFile = await getTelegramFile(token, envelope.document.fileId);
+  const bytes = await downloadTelegramFile(token, telegramFile.file_path);
+  const context = await createAppContext();
+
+  try {
+    try {
+      const result = await importSourceFile(context, {
+        bytes,
+        fileName: envelope.document.fileName ?? "telegram-statement.pdf",
+        sourceChannel: "telegram",
+      });
+
+      return result.reused
+        ? `Batch ${result.batchId} already exists with ${result.candidates.length} candidates. Review it on the website.`
+        : `Batch ${result.batchId} created with ${result.candidates.length} candidates. Review it on the website.`;
+    } catch (error) {
+      return `Failed to import PDF: ${error instanceof Error ? error.message : "Unknown error"}`;
+    }
   } finally {
     await context.client.close();
   }
